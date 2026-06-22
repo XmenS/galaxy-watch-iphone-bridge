@@ -1,5 +1,0 @@
--keepattributes Signature
--keepattributes *Annotation*
--keep,allowobfuscation,allowshrinking class kotlinx.serialization.** { *; }
--keep,allowobfuscation,allowshrinking @kotlinx.serialization.Serializable class *
--keep class androidx.health.connect.client.records.** { *; }
