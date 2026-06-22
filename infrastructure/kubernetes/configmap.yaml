@@ -1,0 +1,13 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ghb-config
+  namespace: galaxy-health-bridge
+data:
+  ENV: "prod"
+  LOG_LEVEL: "info"
+  PUBLIC_URL: "https://api.galaxyhealthbridge.dev"
+  JWT_ALGORITHM: "HS256"
+  E2E_REQUIRED: "true"
+  CORS_ORIGINS: '["https://app.galaxyhealthbridge.dev"]'
+  PROMETHEUS_ENABLED: "true"

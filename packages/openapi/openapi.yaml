@@ -1,0 +1,428 @@
+openapi: 3.1.0
+info:
+  title: Galaxy Health Bridge API
+  version: 0.1.0
+  description: |
+    HTTP API for the Galaxy Health Bridge platform.
+
+    Mobile clients (Android + iOS) authenticate via JWT bearer tokens, register
+    devices, exchange a pair-code to link two devices into the same account, and
+    push/pull health samples through `/v1/sync/*`.
+
+    All timestamps are ISO-8601 with timezone. UUIDs are v4 unless noted.
+    `client_uid` is a UUIDv7 chosen by the client; it is the dedupe key.
+  license:
+    name: MIT
+    identifier: MIT
+servers:
+  - url: https://api.galaxyhealthbridge.dev
+    description: Hosted
+  - url: http://localhost:8000
+    description: Local dev
+
+security:
+  - bearerAuth: []
+
+tags:
+  - { name: auth }
+  - { name: devices }
+  - { name: sync }
+  - { name: admin }
+  - { name: health }
+
+paths:
+  /health:
+    get:
+      tags: [health]
+      security: []
+      summary: Liveness probe
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [status, version]
+                properties:
+                  status: { type: string, example: ok }
+                  version: { type: string }
+
+  /ready:
+    get:
+      tags: [health]
+      security: []
+      summary: Readiness probe (checks PG + Redis)
+      responses:
+        '200': { description: ready }
+        '503': { description: not ready }
+
+  /v1/auth/signup:
+    post:
+      tags: [auth]
+      security: []
+      summary: Create account and issue token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/SignupRequest' }
+      responses:
+        '201': { description: created, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '409': { $ref: '#/components/responses/Conflict' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /v1/auth/login:
+    post:
+      tags: [auth]
+      security: []
+      summary: Exchange email + password for a token pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/LoginRequest' }
+      responses:
+        '200': { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /v1/auth/refresh:
+    post:
+      tags: [auth]
+      security: []
+      summary: Rotate a refresh token for a new pair
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [refresh_token]
+              properties: { refresh_token: { type: string } }
+      responses:
+        '200': { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/auth/me:
+    get:
+      tags: [auth]
+      summary: Current authenticated user
+      responses:
+        '200': { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/User' } } } }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+
+  /v1/devices:
+    get:
+      tags: [devices]
+      summary: List the authenticated user's devices
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: array
+                items: { $ref: '#/components/schemas/Device' }
+    post:
+      tags: [devices]
+      summary: Register or update a device (upsert on install_id)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/DeviceCreate' }
+      responses:
+        '201': { description: created, content: { application/json: { schema: { $ref: '#/components/schemas/Device' } } } }
+
+  /v1/devices/{device_id}:
+    delete:
+      tags: [devices]
+      summary: Revoke a device
+      parameters:
+        - in: path
+          name: device_id
+          required: true
+          schema: { type: string, format: uuid }
+      responses:
+        '204': { description: revoked }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  /v1/devices/pair-code:
+    post:
+      tags: [devices]
+      summary: Issue a 5-minute pairing code to bind a second device
+      responses:
+        '200':
+          description: code
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/PairCode' }
+
+  /v1/devices/redeem:
+    post:
+      tags: [devices]
+      security: []
+      summary: Redeem a pair-code from a new device
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/RedeemPairCode' }
+      responses:
+        '200': { description: ok, content: { application/json: { schema: { $ref: '#/components/schemas/TokenPair' } } } }
+        '400': { $ref: '#/components/responses/BadRequest' }
+
+  /v1/sync/ingest:
+    post:
+      tags: [sync]
+      summary: Push a batch of health samples (idempotent on client_uid)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: { $ref: '#/components/schemas/IngestRequest' }
+      responses:
+        '202':
+          description: accepted
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/IngestResponse' }
+        '400': { $ref: '#/components/responses/BadRequest' }
+        '413': { description: batch too large }
+        '422': { $ref: '#/components/responses/ValidationError' }
+
+  /v1/sync/samples:
+    get:
+      tags: [sync]
+      summary: Page through samples for delivery to a destination (typically iPhone -> HealthKit)
+      parameters:
+        - in: query
+          name: cursor
+          schema: { type: string }
+          description: ISO timestamp returned as next_cursor from a prior call
+        - in: query
+          name: limit
+          schema: { type: integer, minimum: 1, maximum: 2000, default: 500 }
+        - in: query
+          name: type
+          schema:
+            type: array
+            items: { type: string }
+          style: form
+          explode: true
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema: { $ref: '#/components/schemas/SamplesPage' }
+
+  /v1/admin/stats:
+    get:
+      tags: [admin]
+      summary: Admin-only platform stats
+      responses:
+        '200':
+          description: ok
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  users: { type: integer }
+                  samples: { type: integer }
+                  jobs: { type: integer }
+        '403': { $ref: '#/components/responses/Forbidden' }
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: bad request
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Unauthorized:
+      description: unauthorized
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Forbidden:
+      description: forbidden
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    NotFound:
+      description: not found
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    Conflict:
+      description: conflict
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+    ValidationError:
+      description: validation error
+      content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } }
+
+  schemas:
+    Error:
+      type: object
+      required: [detail]
+      properties:
+        detail: { type: string }
+
+    User:
+      type: object
+      required: [id, email, role, is_verified, created_at]
+      properties:
+        id: { type: string, format: uuid }
+        email: { type: string, format: email }
+        role: { type: string, enum: [user, admin] }
+        is_verified: { type: boolean }
+        e2e_pub_key: { type: string, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    SignupRequest:
+      type: object
+      required: [email, password, install_id, device_kind]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 12, maxLength: 128 }
+        dob: { type: string, format: date, nullable: true }
+        install_id: { type: string, minLength: 8, maxLength: 128 }
+        device_kind: { type: string, enum: [android, ios, web] }
+        device_label: { type: string, nullable: true }
+
+    LoginRequest:
+      type: object
+      required: [email, password, install_id, device_kind]
+      properties:
+        email: { type: string, format: email }
+        password: { type: string, minLength: 1 }
+        install_id: { type: string }
+        device_kind: { type: string, enum: [android, ios, web] }
+        device_label: { type: string, nullable: true }
+        totp_code:
+          type: string
+          pattern: '^\d{6}$'
+          nullable: true
+
+    TokenPair:
+      type: object
+      required: [access_token, refresh_token, token_type, access_expires_in, refresh_expires_in]
+      properties:
+        access_token: { type: string }
+        refresh_token: { type: string }
+        token_type: { type: string, default: Bearer }
+        access_expires_in: { type: integer }
+        refresh_expires_in: { type: integer }
+
+    Device:
+      type: object
+      properties:
+        id: { type: string, format: uuid }
+        kind: { type: string, enum: [android, ios, web] }
+        label: { type: string, nullable: true }
+        pub_key: { type: string, nullable: true }
+        app_version: { type: string, nullable: true }
+        os_version: { type: string, nullable: true }
+        last_seen_at: { type: string, format: date-time, nullable: true }
+        revoked_at: { type: string, format: date-time, nullable: true }
+        created_at: { type: string, format: date-time }
+
+    DeviceCreate:
+      type: object
+      required: [install_id, kind]
+      properties:
+        install_id: { type: string }
+        kind: { type: string, enum: [android, ios, web] }
+        label: { type: string, nullable: true }
+        pub_key: { type: string, nullable: true }
+        app_version: { type: string, nullable: true }
+        os_version: { type: string, nullable: true }
+
+    PairCode:
+      type: object
+      required: [code, expires_at]
+      properties:
+        code: { type: string, example: GH-7Q-2K-91 }
+        expires_at: { type: string, format: date-time }
+
+    RedeemPairCode:
+      type: object
+      required: [code, install_id, device_kind]
+      properties:
+        code: { type: string }
+        install_id: { type: string }
+        device_kind: { type: string, enum: [android, ios, web] }
+        device_label: { type: string, nullable: true }
+        pub_key: { type: string, nullable: true }
+
+    HealthSample:
+      type: object
+      required: [client_uid, source, type, started_at, ended_at]
+      properties:
+        client_uid: { type: string, description: "Client-chosen UUIDv7; dedupe key" }
+        source: { type: string, example: samsung-health }
+        type:
+          type: string
+          enum:
+            - steps
+            - distance
+            - active_energy
+            - basal_energy
+            - heart_rate
+            - resting_heart_rate
+            - hrv
+            - spo2
+            - respiratory_rate
+            - body_temperature
+            - blood_pressure_systolic
+            - blood_pressure_diastolic
+            - body_mass
+            - body_fat_percentage
+            - lean_body_mass
+            - sleep_in_bed
+            - sleep_awake
+            - sleep_light
+            - sleep_deep
+            - sleep_rem
+            - workout
+            - mindful_minutes
+            - stand_hours
+            - vo2_max
+            - stress_score
+        unit: { type: string, nullable: true }
+        value: { type: number, nullable: true }
+        started_at: { type: string, format: date-time }
+        ended_at: { type: string, format: date-time }
+        metadata: { type: object, additionalProperties: true }
+        nonce_b64: { type: string, nullable: true, description: "Present when E2E encryption is used" }
+        ciphertext_b64: { type: string, nullable: true }
+
+    IngestRequest:
+      type: object
+      required: [source, samples]
+      properties:
+        source: { type: string }
+        samples:
+          type: array
+          minItems: 1
+          maxItems: 5000
+          items: { $ref: '#/components/schemas/HealthSample' }
+
+    IngestResponse:
+      type: object
+      required: [job_id, accepted, duplicates, rejected]
+      properties:
+        job_id: { type: string, format: uuid }
+        accepted: { type: integer }
+        duplicates: { type: integer }
+        rejected: { type: integer }
+
+    SamplesPage:
+      type: object
+      required: [items]
+      properties:
+        items:
+          type: array
+          items: { $ref: '#/components/schemas/HealthSample' }
+        next_cursor: { type: string, nullable: true }

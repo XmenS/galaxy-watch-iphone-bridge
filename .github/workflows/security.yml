@@ -1,0 +1,53 @@
+name: Security
+on:
+  pull_request:
+  push: { branches: [main] }
+  schedule: [{ cron: "12 6 * * 1" }]
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  codeql:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        language: [python, java, swift]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: github/codeql-action/init@v3
+        with: { languages: ${{ matrix.language }} }
+      - uses: github/codeql-action/autobuild@v3
+      - uses: github/codeql-action/analyze@v3
+
+  pip-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - run: pip install pip-audit
+      - run: pip-audit -r services/api/pyproject.toml --strict
+      - run: pip-audit -r services/worker/pyproject.toml --strict
+
+  trivy-images:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: aquasecurity/trivy-action@0.24.0
+        with:
+          scan-type: fs
+          scan-ref: services
+          severity: CRITICAL,HIGH
+          exit-code: "1"
+          ignore-unfixed: true
+
+  gitleaks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with: { fetch-depth: 0 }
+      - uses: gitleaks/gitleaks-action@v2
+        env: { GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} }

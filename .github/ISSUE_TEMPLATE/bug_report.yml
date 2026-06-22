@@ -1,0 +1,30 @@
+name: Bug report
+description: Something is broken in Galaxy Health Bridge
+labels: [bug, needs-triage]
+body:
+  - type: input
+    id: version
+    attributes: { label: Version / git SHA, placeholder: "v0.1.0 or sha" }
+    validations: { required: true }
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      options: [Backend, Worker, iOS app, Android app, Docker stack, Helm/K8s, Terraform, Docs]
+    validations: { required: true }
+  - type: dropdown
+    id: deploy
+    attributes:
+      label: Deployment
+      options: [Docker Compose, Kubernetes, Bare metal, Local dev, N/A]
+  - type: textarea
+    id: repro
+    attributes: { label: Steps to reproduce, render: bash }
+    validations: { required: true }
+  - type: textarea
+    id: expected
+    attributes: { label: Expected vs actual }
+    validations: { required: true }
+  - type: textarea
+    id: logs
+    attributes: { label: Relevant logs, render: shell }

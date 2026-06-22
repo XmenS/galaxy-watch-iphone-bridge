@@ -1,0 +1,73 @@
+# OS
+.DS_Store
+Thumbs.db
+
+# Editors
+.idea/
+.vscode/
+*.swp
+*.iml
+.fleet/
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+dist/
+build/
+*.egg-info/
+*.egg
+
+# Node
+node_modules/
+.next/
+.turbo/
+out/
+
+# Wear OS / Android (Gradle)
+apps/wearos/.gradle/
+apps/wearos/build/
+apps/wearos/app/build/
+apps/wearos/captures/
+apps/wearos/.cxx/
+apps/wearos/local.properties
+apps/wearos/**/google-services.json
+.gradle/
+
+# iOS / Xcode
+apps/ios/build/
+apps/ios/DerivedData/
+apps/ios/Pods/
+apps/ios/GalaxyHealthBridge.xcodeproj/
+apps/ios/*.xcworkspace/xcuserdata/
+apps/ios/*.xcodeproj/xcuserdata/
+apps/ios/**/*.xcuserstate
+
+# Docker
+.env
+.env.local
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+!terraform.tfvars.example
+.terraform.lock.hcl
+
+# Secrets
+*.pem
+*.key
+*.p8
+*.p12
+secrets/

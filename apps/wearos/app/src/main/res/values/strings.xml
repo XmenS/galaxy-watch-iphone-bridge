@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">HealthBridge</string>
+    <string name="status_idle">Idle</string>
+    <string name="status_advertising">Waiting for iPhone…</string>
+    <string name="status_syncing">Syncing…</string>
+    <string name="start">Start sync</string>
+    <string name="stop">Stop</string>
+</resources>

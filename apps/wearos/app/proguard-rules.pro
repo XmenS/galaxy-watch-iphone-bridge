@@ -1,0 +1,2 @@
+-keep,allowobfuscation,allowshrinking class kotlinx.serialization.** { *; }
+-keep,allowobfuscation,allowshrinking @kotlinx.serialization.Serializable class *

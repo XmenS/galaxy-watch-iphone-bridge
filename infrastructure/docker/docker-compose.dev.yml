@@ -1,0 +1,26 @@
+services:
+  caddy:
+    profiles: ["disabled"]
+
+  api:
+    build:
+      context: ../../services/api
+      target: dev
+    ports:
+      - "8000:8000"
+    volumes:
+      - ../../services/api:/app
+    command: ["uvicorn","app.main:app","--host","0.0.0.0","--port","8000","--reload"]
+
+  worker:
+    build:
+      context: ../../services/worker
+    volumes:
+      - ../../services/worker:/app
+    command: ["celery","-A","app.main:celery","worker","--loglevel=DEBUG","-Q","default,sync,retention","--concurrency=2"]
+    deploy:
+      replicas: 1
+
+  # Postgres & Redis intentionally not exposed to the host in dev to avoid
+  # collisions with other stacks. Reach them from inside the network or via
+  # `docker compose exec postgres psql ...`.

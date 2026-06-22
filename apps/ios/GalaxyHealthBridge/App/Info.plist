@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+  <key>CFBundleDevelopmentRegion</key>
+  <string>en</string>
+  <key>CFBundleDisplayName</key>
+  <string>Galaxy Health Bridge</string>
+  <key>CFBundleExecutable</key>
+  <string>$(EXECUTABLE_NAME)</string>
+  <key>CFBundleIdentifier</key>
+  <string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+  <key>CFBundleInfoDictionaryVersion</key>
+  <string>6.0</string>
+  <key>CFBundleName</key>
+  <string>$(PRODUCT_NAME)</string>
+  <key>CFBundlePackageType</key>
+  <string>APPL</string>
+  <key>CFBundleShortVersionString</key>
+  <string>1.0.0</string>
+  <key>CFBundleVersion</key>
+  <string>1</string>
+  <key>LSRequiresIPhoneOS</key>
+  <true/>
+  <key>UIApplicationSupportsIndirectInputEvents</key>
+  <true/>
+  <key>UILaunchScreen</key>
+  <dict/>
+  <key>UISupportedInterfaceOrientations</key>
+  <array>
+    <string>UIInterfaceOrientationPortrait</string>
+  </array>
+  <key>UIBackgroundModes</key>
+  <array>
+    <string>fetch</string>
+    <string>processing</string>
+    <string>bluetooth-central</string>
+  </array>
+  <key>BGTaskSchedulerPermittedIdentifiers</key>
+  <array>
+    <string>dev.galaxyhealthbridge.refresh</string>
+    <string>dev.galaxyhealthbridge.processing</string>
+  </array>
+  <key>NSHealthShareUsageDescription</key>
+  <string>Galaxy Health Bridge reads HealthKit so it can avoid writing duplicate samples and keep your data accurate.</string>
+  <key>NSHealthUpdateUsageDescription</key>
+  <string>Galaxy Health Bridge writes the metrics from your Galaxy Watch (heart rate, steps, sleep, etc.) into Apple Health.</string>
+  <key>NSBluetoothAlwaysUsageDescription</key>
+  <string>Galaxy Health Bridge uses Bluetooth to pull health data directly from your Galaxy Watch.</string>
+  <key>NSBluetoothPeripheralUsageDescription</key>
+  <string>Galaxy Health Bridge uses Bluetooth to pull health data directly from your Galaxy Watch.</string>
+  <key>ITSAppUsesNonExemptEncryption</key>
+  <false/>
+</dict>
+</plist>

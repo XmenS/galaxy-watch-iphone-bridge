@@ -1,0 +1,49 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ghb-api
+  namespace: galaxy-health-bridge
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt
+    nginx.ingress.kubernetes.io/proxy-body-size: "20m"
+    nginx.ingress.kubernetes.io/limit-rps: "200"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts: [api.galaxyhealthbridge.dev]
+      secretName: ghb-api-tls
+  rules:
+    - host: api.galaxyhealthbridge.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: ghb-api
+                port: { name: http }
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: ghb-api-default-deny
+  namespace: galaxy-health-bridge
+spec:
+  podSelector: {}
+  policyTypes: ["Ingress","Egress"]
+  ingress:
+    - from:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: ingress-nginx } }
+        - podSelector: {}
+  egress:
+    - to:
+        - podSelector: {}
+    - to:
+        - namespaceSelector: { matchLabels: { kubernetes.io/metadata.name: kube-system } }
+      ports:
+        - { protocol: UDP, port: 53 }
+    - ports:
+        - { protocol: TCP, port: 443 }
+        - { protocol: TCP, port: 5432 }
+        - { protocol: TCP, port: 6379 }

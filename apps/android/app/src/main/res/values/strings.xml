@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">Galaxy Health Bridge</string>
+    <string name="onboarding_title">Connect Galaxy Watch to Apple Health</string>
+    <string name="onboarding_grant">Grant Health Connect access</string>
+    <string name="onboarding_generate_code">Generate pair code</string>
+    <string name="dashboard_sync_now">Sync now</string>
+</resources>
