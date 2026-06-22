@@ -1,8 +1,10 @@
 name: Security
 on:
   pull_request:
-  push: { branches: [main] }
-  schedule: [{ cron: "12 6 * * 1" }]
+  push:
+    branches: [main]
+  schedule:
+    - cron: "12 6 * * 1"
 
 permissions:
   contents: read
@@ -10,44 +12,55 @@ permissions:
   actions: read
 
 jobs:
-  codeql:
-    runs-on: ubuntu-latest
-    strategy:
-      matrix:
-        language: [python, java, swift]
+  codeql-swift:
+    name: CodeQL (Swift)
+    runs-on: macos-14
     steps:
       - uses: actions/checkout@v4
       - uses: github/codeql-action/init@v3
-        with: { languages: ${{ matrix.language }} }
-      - uses: github/codeql-action/autobuild@v3
+        with:
+          languages: swift
+      - name: Install xcodegen
+        run: brew install xcodegen
+      - name: Generate Xcode project
+        working-directory: apps/ios
+        run: xcodegen generate
+      - name: Build for CodeQL
+        working-directory: apps/ios
+        run: |
+          xcodebuild \
+            -project GalaxyHealthBridge.xcodeproj \
+            -scheme GalaxyHealthBridge \
+            -destination 'platform=iOS Simulator,name=iPhone 15,OS=17.5' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            build
       - uses: github/codeql-action/analyze@v3
 
-  pip-audit:
+  codeql-kotlin:
+    name: CodeQL (Kotlin)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with: { python-version: "3.12" }
-      - run: pip install pip-audit
-      - run: pip-audit -r services/api/pyproject.toml --strict
-      - run: pip-audit -r services/worker/pyproject.toml --strict
-
-  trivy-images:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: aquasecurity/trivy-action@0.24.0
+      - uses: actions/setup-java@v4
         with:
-          scan-type: fs
-          scan-ref: services
-          severity: CRITICAL,HIGH
-          exit-code: "1"
-          ignore-unfixed: true
+          distribution: temurin
+          java-version: "17"
+      - uses: github/codeql-action/init@v3
+        with:
+          languages: java-kotlin
+      - name: Build for CodeQL
+        working-directory: apps/wearos
+        run: ./gradlew :app:assembleDebug --no-daemon
+      - uses: github/codeql-action/analyze@v3
 
   gitleaks:
+    name: Secret scan
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with: { fetch-depth: 0 }
+        with:
+          fetch-depth: 0
       - uses: gitleaks/gitleaks-action@v2
-        env: { GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }} }
+        env:
+          GITLEAKS_LICENSE: ${{ secrets.GITLEAKS_LICENSE }}

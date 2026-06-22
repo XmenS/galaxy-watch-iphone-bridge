@@ -1,9 +1,1 @@
-*                              @galaxy-health-bridge/steering
-/services/api/                 @galaxy-health-bridge/backend
-/services/worker/              @galaxy-health-bridge/backend
-/apps/ios/                     @galaxy-health-bridge/ios
-/apps/wearos/                  @galaxy-health-bridge/wearos
-/packages/openapi/             @galaxy-health-bridge/backend
-/infrastructure/               @galaxy-health-bridge/devops
-/docs/                         @galaxy-health-bridge/docs
-SECURITY.md                    @galaxy-health-bridge/security
+* @piyush140104

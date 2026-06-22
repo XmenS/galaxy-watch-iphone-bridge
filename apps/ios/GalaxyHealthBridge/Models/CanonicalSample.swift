@@ -1,7 +1,9 @@
 import Foundation
 import HealthKit
 
-/// Server-side canonical health types. Must match the FastAPI `CANONICAL_TYPES` set.
+/// Canonical health sample types that this app maps between the watch's wire format
+/// and HealthKit. Only the types the watch can produce today are wired through
+/// end-to-end; the rest are present so the mapping is exhaustive.
 enum CanonicalSampleType: String, CaseIterable, Codable {
     case steps
     case distance

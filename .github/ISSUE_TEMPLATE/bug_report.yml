@@ -4,27 +4,48 @@ labels: [bug, needs-triage]
 body:
   - type: input
     id: version
-    attributes: { label: Version / git SHA, placeholder: "v0.1.0 or sha" }
-    validations: { required: true }
+    attributes:
+      label: Version / git SHA
+      placeholder: "v0.1.0 or commit sha"
+    validations:
+      required: true
   - type: dropdown
     id: component
     attributes:
       label: Component
-      options: [Backend, Worker, iOS app, Android app, Docker stack, Helm/K8s, Terraform, Docs]
-    validations: { required: true }
-  - type: dropdown
-    id: deploy
+      options:
+        - iOS app
+        - Wear OS app
+        - BLE protocol (both sides)
+        - Build / CI
+        - Docs
+    validations:
+      required: true
+  - type: input
+    id: iphone
     attributes:
-      label: Deployment
-      options: [Docker Compose, Kubernetes, Bare metal, Local dev, N/A]
+      label: iPhone model + iOS version
+      placeholder: "iPhone 14 Pro, iOS 17.5"
+  - type: input
+    id: watch
+    attributes:
+      label: Galaxy Watch model + Wear OS version
+      placeholder: "Galaxy Watch 6 Classic, Wear OS 4"
   - type: textarea
     id: repro
-    attributes: { label: Steps to reproduce, render: bash }
-    validations: { required: true }
+    attributes:
+      label: Steps to reproduce
+      render: bash
+    validations:
+      required: true
   - type: textarea
     id: expected
-    attributes: { label: Expected vs actual }
-    validations: { required: true }
+    attributes:
+      label: Expected vs actual
+    validations:
+      required: true
   - type: textarea
     id: logs
-    attributes: { label: Relevant logs, render: shell }
+    attributes:
+      label: Relevant logs (Xcode console, adb logcat)
+      render: shell

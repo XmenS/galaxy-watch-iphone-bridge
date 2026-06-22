@@ -53,7 +53,7 @@ Sleep stages, SpO2 and workouts are on the roadmap. See `docs/ROADMAP.md`.
 
 Every few seconds the watch reads new data from the Wear OS Health Services API, plus a live heart rate stream from the MeasureClient. It stores the latest daily totals in a tiny local database and exposes them on a custom Bluetooth service. When the iPhone connects, it asks the watch for everything newer than the last cursor it knows about, receives the data as small JSON frames, and writes each sample into Apple Health with a tag so you can see it came from the watch.
 
-The full architecture lives in `docs/ARCHITECTURE.md` if you want the deep dive.
+The wire protocol and the rest of the moving parts are documented in `docs/ARCHITECTURE.md`.
 
 ## Install
 
@@ -103,17 +103,17 @@ Then build and run from Xcode. See the install guides for the device side steps.
 
 ## Running the tests
 
-We added unit tests for the parts of the code that have a real chance of breaking. If you submit a pull request, please keep these green.
+Unit tests cover the BLE protocol parser, watch-to-iPhone timestamp rebasing and the canonical-sample to HealthKit mapping. Please keep them green on any pull request.
 
 ```bash
 # Watch
 cd apps/wearos && ./gradlew :app:testDebugUnitTest
 
-# iPhone
-cd apps/ios && xcodebuild test \
+# iPhone (regenerate the project first if you do not have it yet)
+cd apps/ios && xcodegen generate && xcodebuild test \
   -project GalaxyHealthBridge.xcodeproj \
   -scheme GalaxyHealthBridge \
-  -destination 'platform=iOS Simulator,name=iPhone 16 Pro' \
+  -destination 'platform=iOS Simulator,name=iPhone 16 Pro,OS=18.6' \
   CODE_SIGNING_ALLOWED=NO
 ```
 

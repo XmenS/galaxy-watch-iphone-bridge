@@ -32,13 +32,12 @@ targets:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
       - sdk: HealthKit.framework
-      - sdk: BackgroundTasks.framework
       - sdk: CoreBluetooth.framework
     capabilities:
       HealthKit:
         enabled: true
       BackgroundModes:
-        modes: [fetch, processing, bluetooth-central]
+        modes: [bluetooth-central]
 
   GalaxyHealthBridgeTests:
     type: bundle.unit-test

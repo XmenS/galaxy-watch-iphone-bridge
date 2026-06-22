@@ -2,7 +2,8 @@
 
 This walks you through the actual round-trip test once both apps are installed. If you haven't installed them yet, start with [`INSTALL_WEAROS.md`](INSTALL_WEAROS.md) and [`INSTALL_IOS.md`](INSTALL_IOS.md) first.
 
-> Contributors looking for the automated test layout (unit/integration/CI) should read [`DEVELOPER_TESTING.md`](DEVELOPER_TESTING.md) instead.
+The unit-test layout (BLE protocol parser tests on the watch, sample-mapping
+tests on the iPhone) is described in `README.md` under *Running the tests*.
 
 ## Prerequisites checklist
 

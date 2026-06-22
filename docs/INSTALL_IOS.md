@@ -17,7 +17,7 @@ Xcode is Apple's developer toolchain. We need it to sign the app for your iPhone
 
 1. Open the **Mac App Store** on the Mac.
 2. Search for **Xcode**. Click **Get** / **Install**.
-3. **Heads up:** Xcode is ~15 GB. On home Wi-Fi this takes 30-60 minutes. Start it and go make coffee.
+3. Xcode is around 15 GB. On home Wi-Fi expect 30 to 60 minutes for the download to finish.
 4. When done, launch Xcode at least once and accept the license. It will install command-line tools on first launch.
 
 Then in a Terminal:

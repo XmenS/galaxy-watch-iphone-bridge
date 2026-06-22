@@ -32,14 +32,7 @@
   </array>
   <key>UIBackgroundModes</key>
   <array>
-    <string>fetch</string>
-    <string>processing</string>
     <string>bluetooth-central</string>
-  </array>
-  <key>BGTaskSchedulerPermittedIdentifiers</key>
-  <array>
-    <string>dev.galaxyhealthbridge.refresh</string>
-    <string>dev.galaxyhealthbridge.processing</string>
   </array>
   <key>NSHealthShareUsageDescription</key>
   <string>Galaxy Health Bridge reads HealthKit so it can avoid writing duplicate samples and keep your data accurate.</string>

@@ -1,148 +1,105 @@
-# Section 2 — Architecture
+# Architecture
 
-## 2.1 High-level
+The project is two apps that talk over Bluetooth LE. There is no server, no
+account system, no cloud component.
 
-```mermaid
-flowchart LR
-  subgraph Wrist
-    GW[Galaxy Watch]
-  end
-  subgraph Android Phone
-    SH[Samsung Health]
-    HC[Health Connect]
-    AND[Android Companion App]
-  end
-  subgraph Backend
-    CD[(Caddy / TLS)]
-    API[FastAPI API]
-    W[Celery Worker]
-    PG[(PostgreSQL)]
-    R[(Redis)]
-    S3[(S3 - opt., blob samples)]
-  end
-  subgraph iPhone
-    IOS[iPhone Companion App]
-    HK[HealthKit]
-  end
-
-  GW -- BLE --> SH
-  SH -- write --> HC
-  AND -- read --> HC
-  AND -- HTTPS / TLS --> CD
-  CD --> API
-  API --> PG
-  API --> R
-  W --> R
-  W --> PG
-  W --> S3
-  IOS -- HTTPS / TLS --> CD
-  CD --> API
-  IOS -- write --> HK
+```
+ Galaxy Watch (Wear OS app)              iPhone (iOS app)
+ ┌────────────────────────────┐          ┌────────────────────────────┐
+ │ HealthReader               │          │ BLESyncView (UI)           │
+ │   ↓                        │          │   ↓                        │
+ │ Wear Health Services       │          │ BLESyncCoordinator         │
+ │   (passive + measure)      │          │   ↓                        │
+ │   ↓                        │          │ BLEClient (CoreBluetooth)  │
+ │ SampleStore (Room DB)      │   BLE    │   ↓                        │
+ │   ↓                        │ ───────► │ HealthKitManager           │
+ │ GattServer (BLE peripheral)│          │   ↓                        │
+ └────────────────────────────┘          │ HealthKit                  │
+                                         └────────────────────────────┘
 ```
 
-## 2.2 Sequence: end-to-end sync
+The watch is the BLE peripheral, the iPhone is the central. The wire contract
+is small and lives in two files that mirror each other:
 
-```mermaid
-sequenceDiagram
-  autonumber
-  participant W as Galaxy Watch
-  participant SH as Samsung Health
-  participant HC as Health Connect
-  participant A as Android App
-  participant API as Backend API
-  participant Q as Worker (Celery)
-  participant I as iPhone App
-  participant HK as HealthKit
+* Watch: `apps/wearos/app/src/main/kotlin/dev/galaxyhealthbridge/wearos/ble/Protocol.kt`
+* iPhone: `apps/ios/GalaxyHealthBridge/Services/BLEClient.swift`
 
-  W->>SH: BLE sample (HR, steps, sleep)
-  SH->>HC: writeRecords()
-  Note over A: WorkManager fires every 15 min
-  A->>HC: readRecords(since=last_cursor)
-  HC-->>A: List<HealthRecord>
-  A->>A: map → canonical sample
-  A->>A: encrypt(sample, user_pub_key)
-  A->>API: POST /v1/sync/ingest (batch, client_uid per sample)
-  API->>API: upsert (user_id, source, client_uid)
-  API-->>A: 202 {job_id, accepted}
-  API->>Q: enqueue fan-out job
-  Q->>Q: aggregate by destination
-  Note over I: BGAppRefreshTask fires
-  I->>API: GET /v1/samples?since=cursor&for=ios
-  API-->>I: encrypted samples + cursor
-  I->>I: decrypt(user_priv_key)
-  I->>HK: HKHealthStore.save(samples)
-  HK-->>I: success
-  I->>API: PATCH /v1/samples/ack {cursor}
+## BLE service
+
+```
+Service        e2a00001-1234-5678-9abc-def012345678
+  REQUEST char e2a00002-...  write-without-response  (8 bytes LE: cursor in ms)
+  STREAM  char e2a00003-...  notify                  (JSON frame chunks)
+  STATUS  char e2a00004-...  read + notify           (JSON status payload)
 ```
 
-## 2.3 Sequence: device pairing
+* **REQUEST**: the iPhone writes the 8-byte millisecond cursor it last
+  successfully ingested. A sentinel value tells the watch to reset its local
+  sample buffer before streaming.
+* **STREAM**: the watch sends JSON frames of type `data` (a batch of samples)
+  followed by exactly one `done` frame (`{ newest_ms, total }`).
+* **STATUS**: a quick read used by the iPhone UI to show the newest sample
+  timestamp and the pending count without forcing a full sync.
 
-```mermaid
-sequenceDiagram
-  participant U as User
-  participant A as Android App
-  participant API as Backend
-  participant I as iPhone App
+## Sample model
 
-  U->>A: Sign up (email+password OR magic link)
-  A->>API: POST /v1/auth/signup
-  API-->>A: {access, refresh}
-  A->>A: generate Curve25519 keypair (X25519)
-  A->>API: POST /v1/devices {pub_key, kind:"android"}
-  API-->>A: device_id
+Both sides agree on a small canonical record:
 
-  U->>A: "Pair iPhone"
-  A->>API: POST /v1/devices/pair-code
-  API-->>A: {code:"GH-7Q-2K-91", expires_at}
-  A-->>U: shows code
+| field        | type    | notes                                                          |
+|--------------|---------|----------------------------------------------------------------|
+| `client_uid` | string  | UUID picked by the watch. Used as the HealthKit dedupe key.    |
+| `type`       | string  | One of `heart_rate`, `steps`, `distance`, `active_energy`, `flights_climbed`. |
+| `unit`       | string? | Matches the HealthKit unit for that type.                      |
+| `value`      | number? | The reading. Numeric types only.                               |
+| `started_at` | int64   | Sample start, ms since epoch (watch clock).                    |
+| `ended_at`   | int64   | Sample end, ms since epoch.                                    |
+| `metadata`   | object? | Free-form context (e.g. measurement context for heart rate).    |
 
-  U->>I: Open iPhone app, enter code
-  I->>API: POST /v1/devices/redeem {code}
-  API-->>I: {access, refresh, peer_pub_key}
-  I->>I: generate keypair, exchange with peer
-  I->>API: POST /v1/devices {pub_key, kind:"ios"}
-```
+Sample types currently wired end-to-end are listed in the README. The iOS
+`CanonicalSampleType` enum lists more cases so the mapping layer is ready when
+new metric streams are added, but the watch only emits the types above.
 
-## 2.4 Data flow contract
+## Sync flow
 
-Canonical sample schema (lingua franca between Android and iOS):
+1. The watch's `SyncService` (a foreground service) starts `HealthReader` and
+   `GattServer`. The reader subscribes to `PassiveMonitoringClient` for steps /
+   calories / distance / floors, and to `MeasureClient` for live heart rate.
+2. As samples arrive, the reader writes them into Room (`SampleStore`).
+3. The iPhone scans for the service UUID, connects, and writes its cursor on
+   the REQUEST characteristic.
+4. The watch reads `SampleStore` rows newer than the cursor, splits them into
+   frames sized to fit the negotiated MTU, and pushes them on STREAM.
+5. The iPhone collects each frame, decodes to `CanonicalSample`, rebases
+   timestamps if the watch clock is obviously wrong (see `rebaseTimestamps` in
+   `BLESyncCoordinator`), maps to `HKSample`, and writes via `HKHealthStore`.
+6. After the watch sends `done`, the iPhone stores the newest timestamp it saw
+   as the cursor so the next sync skips everything it already has.
 
-```json
-{
-  "client_uid": "01HV2P7K6E5R3Q8M2J9XYZ0001",   // UUIDv7 from Android
-  "source": "samsung-health",
-  "type": "heart_rate",
-  "unit": "bpm",
-  "value": 72.0,
-  "started_at": "2026-06-18T14:30:00Z",
-  "ended_at":   "2026-06-18T14:30:01Z",
-  "device": { "manufacturer": "Samsung", "model": "Galaxy Watch7" },
-  "metadata": { "samsung_uid": "...", "confidence": 0.99 }
-}
-```
+## Time rebasing
 
-Encryption envelope (when E2E mode on):
+If the watch reports a sample with `ended_at` more than a few weeks away from
+the iPhone's current time, the iPhone treats the watch clock as wrong, rebases
+`ended_at` to `now`, and preserves the original `ended_at − started_at`
+duration. This is covered by
+`BLESyncCoordinatorTests.testRebaseRewritesTimestampsWhenWatchClockIsWildlyOff`.
 
-```json
-{
-  "client_uid": "01HV2P7K6E5R3Q8M2J9XYZ0001",
-  "type": "heart_rate",
-  "started_at": "2026-06-18T14:30:00Z",
-  "ended_at":   "2026-06-18T14:30:01Z",
-  "nonce_b64": "...",
-  "ciphertext_b64": "..."
-}
-```
+## Dedupe
 
-Server sees only the outer envelope. Type and timestamps are intentionally plaintext so the server can dedupe and index without decryption.
+The iPhone passes `client_uid` into `HKMetadataKeyExternalUUID` so HealthKit's
+own dedupe drops a sample that has already been written. Re-running a sync is
+safe.
 
-## 2.5 Component responsibilities
+## Storage
 
-| Component | Owns | Does NOT own |
-|---|---|---|
-| Android app | Health Connect reads, mapping, encryption, upload, retry queue | Display analytics, push notifications to iPhone |
-| iPhone app | Download, decryption, HealthKit writes, dedupe vs HealthKit anchor | Reading Health Connect |
-| Backend API | Auth, device registry, sample storage, fan-out, audit log | Decryption, HealthKit write |
-| Worker | Aggregation, retention enforcement, webhook delivery | User-facing request handling |
-| Postgres | Source of truth for everything except blob bodies | Sample blobs (over 1KB → S3) |
-| Redis | Job queue, rate-limit counters, ephemeral sync cursors | Persistent data |
+* Watch: a single-table Room DB at `apps/wearos/app/src/main/kotlin/.../data/SampleStore.kt`.
+* iPhone: a `cursor` value plus an install ID in `UserDefaults`
+  (`apps/ios/GalaxyHealthBridge/Storage/LocalStore.swift`). HealthKit owns the
+  actual sample storage.
+
+## What is not in this repo
+
+There is no backend service, no message queue, no relational database, no
+Docker stack, no Terraform, and no account system. The project is intentionally
+limited to the BLE pipeline above. The iPhone needs to be unlocked with the
+app foregrounded for a sync to run; background sync over BLE is a roadmap item,
+not a shipped feature.
