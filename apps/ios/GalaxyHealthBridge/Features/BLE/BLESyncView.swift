@@ -1,4 +1,5 @@
 import SwiftUI
+import CoreBluetooth
 
 struct BLESyncView: View {
     @EnvironmentObject private var coordinator: BLESyncCoordinator
@@ -9,6 +10,7 @@ struct BLESyncView: View {
                 VStack(spacing: 16) {
                     statusCard
                     statsCard
+                    diagnosticsCard
                     syncButton
                     if let err = coordinator.error, !err.isEmpty {
                         errorCard(err)
@@ -53,6 +55,8 @@ struct BLESyncView: View {
     private var statsCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             Text("Last sync").font(.headline)
+            Text(coordinator.lastSyncAt?.formatted(date: .abbreviated, time: .standard) ?? "Never")
+                .font(.caption).foregroundStyle(.secondary)
             HStack(spacing: 12) {
                 stat(label: "Written", value: "\(coordinator.lastWritten)", tint: .green)
                 stat(label: "Skipped", value: "\(coordinator.lastSkipped)", tint: .orange)
@@ -62,6 +66,28 @@ struct BLESyncView: View {
         .padding(16)
         .frame(maxWidth: .infinity, alignment: .leading)
         .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private var diagnosticsCard: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Diagnostics").font(.headline)
+            diagnosticRow("Bluetooth", bluetoothAuthorization)
+            diagnosticRow("Watch cursor", coordinator.cursorMs > 0 ? "Available" : "No completed sync")
+            DisclosureGroup("HealthKit write permissions") {
+                ForEach(Array(coordinator.healthAuthorizationDetails.enumerated()), id: \.offset) { _, row in
+                    diagnosticRow(row.0, row.1)
+                }
+                Text("Apple does not disclose read-denial status to apps.")
+                    .font(.caption2).foregroundStyle(.secondary)
+            }
+        }
+        .padding(16)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background(.regularMaterial, in: RoundedRectangle(cornerRadius: 18))
+    }
+
+    private func diagnosticRow(_ name: String, _ value: String) -> some View {
+        HStack { Text(name).font(.caption); Spacer(); Text(value).font(.caption).foregroundStyle(.secondary) }
     }
 
     private func stat(label: String, value: String, tint: Color) -> some View {
@@ -169,6 +195,16 @@ struct BLESyncView: View {
         if ms <= 0 { return "—" }
         let d = Date(timeIntervalSince1970: TimeInterval(ms) / 1000.0)
         return d.formatted(date: .omitted, time: .shortened)
+    }
+
+    private var bluetoothAuthorization: String {
+        switch CBManager.authorization {
+        case .allowedAlways: return "Allowed"
+        case .denied: return "Denied"
+        case .restricted: return "Restricted"
+        case .notDetermined: return "Not requested"
+        @unknown default: return "Unknown"
+        }
     }
 }
 

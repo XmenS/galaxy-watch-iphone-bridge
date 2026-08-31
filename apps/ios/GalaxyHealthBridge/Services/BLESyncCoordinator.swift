@@ -11,6 +11,7 @@ final class BLESyncCoordinator: ObservableObject {
     @Published var lastSkipped: Int = 0
     @Published var isRunning: Bool = false
     @Published var error: String?
+    @Published var lastSyncAt: Date?
 
     private let client = BLEClient()
     private let hk: HealthKitManager
@@ -18,10 +19,13 @@ final class BLESyncCoordinator: ObservableObject {
     private let log = Logger(subsystem: "dev.galaxyhealthbridge", category: "ble.sync")
 
     private static let cursorKey = "ghb.ble_cursor_ms"
+    private static let lastSyncKey = "ghb.last_sync_at"
 
     init(hk: HealthKitManager = .live(), store: LocalStore = LocalStore()) {
         self.hk = hk
         self.store = store
+        let timestamp = UserDefaults.standard.double(forKey: Self.lastSyncKey)
+        self.lastSyncAt = timestamp > 0 ? Date(timeIntervalSince1970: timestamp) : nil
     }
 
     var cursorMs: Int64 {
@@ -68,6 +72,9 @@ final class BLESyncCoordinator: ObservableObject {
                         self.client.acknowledgeHealthKitCommit(newestMs: newest, total: total)
                     case .done(let newest, let total):
                         if newest > self.cursorMs { self.cursorMs = newest }
+                        let completedAt = Date()
+                        self.lastSyncAt = completedAt
+                        UserDefaults.standard.set(completedAt.timeIntervalSince1970, forKey: Self.lastSyncKey)
                         self.status = "Done. \(total) sample\(total == 1 ? "" : "s") received."
                         self.lastWritten = written
                         self.lastSkipped = skipped
@@ -92,6 +99,10 @@ final class BLESyncCoordinator: ObservableObject {
         }
         await work.value
         timeout.cancel()
+    }
+
+    var healthAuthorizationDetails: [(String, String)] {
+        hk.authorizationDetails
     }
 
     /// Maps the Watch's compact wire `Sample` to the iOS `CanonicalSample` shape.

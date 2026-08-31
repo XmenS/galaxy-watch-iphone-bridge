@@ -68,6 +68,20 @@ final class HealthKitManager {
         return .needsPrompt
     }
 
+    var authorizationDetails: [(String, String)] {
+        CanonicalSampleType.allCases.compactMap { canonical in
+            guard let type = canonical.healthKitWriteType else { return nil }
+            let status: String
+            switch store.authorizationStatus(for: type) {
+            case .sharingAuthorized: status = "Write allowed"
+            case .sharingDenied: status = "Write denied"
+            case .notDetermined: status = "Not requested"
+            @unknown default: status = "Unknown"
+            }
+            return (canonical.displayName, status)
+        }
+    }
+
     // MARK: – Writing
 
     /// Persists a batch of canonical samples to HealthKit. Each sample carries its
