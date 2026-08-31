@@ -391,7 +391,7 @@ extension HealthKitManager {
 
     private func isCumulative(_ m: CanonicalSampleType) -> Bool {
         switch m {
-        case .steps, .distance, .activeEnergy, .basalEnergy: return true
+        case .steps, .distance, .flightsClimbed, .activeEnergy, .basalEnergy: return true
         default: return false
         }
     }
@@ -400,6 +400,7 @@ extension HealthKitManager {
         switch m {
         case .steps:                                 return "steps"
         case .distance:                              return "km"
+        case .flightsClimbed:                        return "floors"
         case .activeEnergy, .basalEnergy:            return "kcal"
         case .heartRate, .restingHeartRate:          return "bpm"
         case .hrv:                                   return "ms"

@@ -57,6 +57,9 @@ interface SampleDao {
 
     @Query("DELETE FROM samples WHERE startMs < :olderThanMs")
     suspend fun deleteOlderThan(olderThanMs: Long)
+
+    @Query("DELETE FROM samples WHERE startMs <= :cursorMs")
+    suspend fun deleteThrough(cursorMs: Long): Int
 }
 
 @Database(entities = [SampleRow::class], version = 1, exportSchema = false)
@@ -90,4 +93,7 @@ class SampleStore(private val ctx: Context) {
     suspend fun clear() = withContext(Dispatchers.IO) { dao.deleteAll() }
     suspend fun pruneOlderThan(olderThanMs: Long) =
         withContext(Dispatchers.IO) { dao.deleteOlderThan(olderThanMs) }
+
+    suspend fun pruneThrough(cursorMs: Long): Int =
+        withContext(Dispatchers.IO) { dao.deleteThrough(cursorMs) }
 }

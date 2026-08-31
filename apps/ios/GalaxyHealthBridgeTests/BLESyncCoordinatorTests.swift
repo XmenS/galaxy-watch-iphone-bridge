@@ -53,7 +53,7 @@ final class BLESyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(canonical.source, "GalaxyWatch")
     }
 
-    func testCaloriesWireSampleMaps() throws {
+    func testLegacyActiveCaloriesWireSampleMaps() throws {
         let now = Date()
         let nowMs = Int64(now.timeIntervalSince1970 * 1000)
         let wire = WireSample(uid: "cal-day-2026-173", t: "cal", v: 17.0, u: "kcal",
@@ -61,6 +61,18 @@ final class BLESyncCoordinatorTests: XCTestCase {
         let canonical = try XCTUnwrap(BLESyncCoordinator.toCanonical(wire, now: now))
         XCTAssertEqual(canonical.type, .activeEnergy)
         XCTAssertEqual(canonical.value, 17.0)
+    }
+
+    func testTotalCaloriesAreNotMisrepresentedAsActiveEnergy() {
+        let wire = WireSample(uid: "cal-total", t: "cal_total", v: 2100, u: "kcal", s: 1_700_000_000_000, e: 1_700_000_001_000)
+        XCTAssertNil(BLESyncCoordinator.toCanonical(wire))
+    }
+
+    func testFloorsMapToFlightsClimbed() throws {
+        let wire = WireSample(uid: "floors-1", t: "floors", v: 6, u: "count", s: 1_700_000_000_000, e: 1_700_000_001_000)
+        let canonical = try XCTUnwrap(BLESyncCoordinator.toCanonical(wire))
+        XCTAssertEqual(canonical.type, .flightsClimbed)
+        XCTAssertEqual(canonical.value, 6)
     }
 
     func testDistanceWireSampleMaps() throws {

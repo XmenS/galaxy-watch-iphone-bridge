@@ -106,9 +106,16 @@ class GattServer(
             addDescriptor(BluetoothGattDescriptor(Protocol.CCCD_UUID, BluetoothGattDescriptor.PERMISSION_WRITE))
         }
 
+        val ack = BluetoothGattCharacteristic(
+            Protocol.ACK_UUID,
+            BluetoothGattCharacteristic.PROPERTY_WRITE,
+            BluetoothGattCharacteristic.PERMISSION_WRITE,
+        )
+
         svc.addCharacteristic(request)
         svc.addCharacteristic(stream)
         svc.addCharacteristic(status)
+        svc.addCharacteristic(ack)
         streamChar = stream
         statusChar = status
         return svc
@@ -207,6 +214,20 @@ class GattServer(
                     }
                     stream(device, payload.cursorMs)
                 }
+            } else if (characteristic.uuid == Protocol.ACK_UUID) {
+                val ack = AckPayload.parse(value)
+                if (ack == null) {
+                    Log.w(TAG, "invalid ACK bytes=${value.size}")
+                    if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_INVALID_ATTRIBUTE_LENGTH, 0, null)
+                    return
+                }
+                scope.launch(Dispatchers.IO) {
+                    val removed = store.pruneThrough(ack.cursorMs)
+                    Log.i(TAG, "ACK committed cursor=${ack.cursorMs}; pruned=$removed")
+                    BleState.status.value = "Confirmed $removed samples"
+                    if (responseNeeded) server?.sendResponse(device, requestId, BluetoothGatt.GATT_SUCCESS, 0, null)
+                    refreshStatusOnce(device)
+                }
             } else if (responseNeeded) {
                 server?.sendResponse(device, requestId, BluetoothGatt.GATT_FAILURE, 0, null)
             }
@@ -289,6 +310,12 @@ class GattServer(
             }
             delay(60_000)
         }
+    }
+
+    private suspend fun refreshStatusOnce(device: BluetoothDevice) {
+        val ch = statusChar ?: return
+        ch.value = currentStatusJson()
+        runCatching { server?.notifyCharacteristicChanged(device, ch, false) }
     }
 
     private fun leLongFromBytes(b: ByteArray): Long {

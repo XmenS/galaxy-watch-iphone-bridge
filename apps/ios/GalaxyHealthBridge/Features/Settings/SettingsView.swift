@@ -72,20 +72,20 @@ struct SettingsView: View {
     private var metricsSection: some View {
         Section {
             ForEach(CanonicalSampleType.allCases, id: \.self) { metric in
-                HStack(spacing: 12) {
+                Toggle(isOn: enabledBinding(for: metric)) {
+                    HStack(spacing: 12) {
                     Image(systemName: metric.iconName)
                         .font(.subheadline)
                         .foregroundStyle(metric.tintColor)
                         .frame(width: 30, height: 30)
                         .background(metric.tintColor.opacity(0.15), in: Circle())
                     Text(metric.displayName)
-                    Spacer()
-                    Image(systemName: metric.healthKitWriteType != nil ? "checkmark.circle.fill" : "minus.circle")
-                        .foregroundStyle(metric.healthKitWriteType != nil ? .green : .secondary)
+                    }
                 }
+                .disabled(metric.healthKitWriteType == nil)
             }
         } header: { Text("What this app syncs") } footer: {
-            Text("Green = mapped to HealthKit. Grey = collected but not yet a HealthKit type.")
+            Text("Disabled rows have no safe HealthKit mapping. Changes apply to the next sync.")
                 .font(.caption2)
         }
     }
@@ -162,5 +162,12 @@ struct SettingsView: View {
         let v = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "?"
         let b = Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "?"
         return "\(v) (\(b))"
+    }
+
+    private func enabledBinding(for metric: CanonicalSampleType) -> Binding<Bool> {
+        Binding(
+            get: { SyncPreferences.isEnabled(metric) },
+            set: { SyncPreferences.setEnabled($0, for: metric) }
+        )
     }
 }

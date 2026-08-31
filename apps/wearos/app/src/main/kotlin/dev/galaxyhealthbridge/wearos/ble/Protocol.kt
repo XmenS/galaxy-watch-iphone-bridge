@@ -19,6 +19,7 @@ object Protocol {
     val REQUEST_UUID: UUID  = UUID.fromString("e2a00002-1234-5678-9abc-def012345678")
     val STREAM_UUID: UUID   = UUID.fromString("e2a00003-1234-5678-9abc-def012345678")
     val STATUS_UUID: UUID   = UUID.fromString("e2a00004-1234-5678-9abc-def012345678")
+    val ACK_UUID: UUID      = UUID.fromString("e2a00005-1234-5678-9abc-def012345678")
     // Standard Bluetooth descriptor for Client Characteristic Configuration (enables notify).
     val CCCD_UUID: UUID     = UUID.fromString("00002902-0000-1000-8000-00805f9b34fb")
 
@@ -41,6 +42,24 @@ object Protocol {
         val pending: Int,
         val battery: Int = -1,
     )
+}
+
+/** Highest watch timestamp durably committed by the iPhone to HealthKit. */
+data class AckPayload(val cursorMs: Long) {
+    companion object {
+        fun parse(bytes: ByteArray): AckPayload? =
+            if (bytes.size < 8) null else AckPayload(leLong(bytes))
+
+        private fun leLong(b: ByteArray): Long =
+            (b[0].toLong() and 0xff) or
+            ((b[1].toLong() and 0xff) shl 8) or
+            ((b[2].toLong() and 0xff) shl 16) or
+            ((b[3].toLong() and 0xff) shl 24) or
+            ((b[4].toLong() and 0xff) shl 32) or
+            ((b[5].toLong() and 0xff) shl 40) or
+            ((b[6].toLong() and 0xff) shl 48) or
+            ((b[7].toLong() and 0xff) shl 56)
+    }
 }
 
 /** Canonical health sample on the wire. Compact field names because BLE MTU is small. */

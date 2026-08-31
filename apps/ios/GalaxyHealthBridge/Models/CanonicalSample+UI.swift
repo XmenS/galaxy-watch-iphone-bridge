@@ -6,6 +6,7 @@ extension CanonicalSampleType {
         switch self {
         case .steps:                  return "figure.walk"
         case .distance:               return "location.fill"
+        case .flightsClimbed:         return "stairs"
         case .activeEnergy:           return "flame.fill"
         case .basalEnergy:            return "bolt.fill"
         case .heartRate:              return "heart.fill"
@@ -36,7 +37,7 @@ extension CanonicalSampleType {
         switch self {
         case .activeEnergy, .basalEnergy, .bodyTemperature:
             return .orange
-        case .steps, .distance, .standHours:
+        case .steps, .distance, .flightsClimbed, .standHours:
             return .green
         case .heartRate, .restingHeartRate, .hrv:
             return .red

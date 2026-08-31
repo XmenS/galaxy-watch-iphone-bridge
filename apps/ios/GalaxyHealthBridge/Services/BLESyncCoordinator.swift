@@ -53,7 +53,8 @@ final class BLESyncCoordinator: ObservableObject {
                     case .connecting(let name): self.status = "Connecting to \(name)…"
                     case .syncing:     self.status = "Syncing samples…"
                     case .batch(let items):
-                        let canonical = items.compactMap { Self.toCanonical($0) }
+                        let mapped = items.compactMap { Self.toCanonical($0) }
+                        let canonical = mapped.filter { SyncPreferences.isEnabled($0.type) }
                         if !canonical.isEmpty {
                             let outcome = try await self.hk.save(canonical)
                             written += outcome.written
@@ -62,6 +63,9 @@ final class BLESyncCoordinator: ObservableObject {
                             skipped += items.count
                         }
                         self.status = "Wrote \(written) so far…"
+                    case .readyToAcknowledge(let newest, let total):
+                        self.status = "Confirming \(total) HealthKit records..."
+                        self.client.acknowledgeHealthKitCommit(newestMs: newest, total: total)
                     case .done(let newest, let total):
                         if newest > self.cursorMs { self.cursorMs = newest }
                         self.status = "Done. \(total) sample\(total == 1 ? "" : "s") received."
@@ -100,6 +104,7 @@ final class BLESyncCoordinator: ObservableObject {
         case "steps":  type = .steps
         case "cal":    type = .activeEnergy
         case "dist":   type = .distance
+        case "floors": type = .flightsClimbed
         case "sleep_in_bed": type = .sleepInBed
         case "sleep_awake":  type = .sleepAwake
         case "sleep_light":  type = .sleepLight

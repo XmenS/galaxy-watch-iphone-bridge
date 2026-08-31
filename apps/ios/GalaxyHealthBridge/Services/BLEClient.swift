@@ -21,6 +21,7 @@ final class BLEClient: NSObject {
         case connecting(peripheral: String)
         case syncing
         case batch([WireSample])
+        case readyToAcknowledge(newestMs: Int64, total: Int)
         case done(newestMs: Int64, total: Int)
         case error(BLEError)
     }
@@ -51,11 +52,17 @@ final class BLEClient: NSObject {
     static let requestUUID = CBUUID(string: "e2a00002-1234-5678-9abc-def012345678")
     static let streamUUID  = CBUUID(string: "e2a00003-1234-5678-9abc-def012345678")
     static let statusUUID  = CBUUID(string: "e2a00004-1234-5678-9abc-def012345678")
+    static let ackUUID     = CBUUID(string: "e2a00005-1234-5678-9abc-def012345678")
 
-    private lazy var manager: CBCentralManager = CBCentralManager(delegate: self, queue: .main)
+    private lazy var manager: CBCentralManager = CBCentralManager(
+        delegate: self, queue: .main,
+        options: [CBCentralManagerOptionRestoreIdentifierKey: "dev.galaxyhealthbridge.central"]
+    )
     private var peripheral: CBPeripheral?
     private var requestChar: CBCharacteristic?
     private var streamChar: CBCharacteristic?
+    private var ackChar: CBCharacteristic?
+    private var pendingAcknowledgement: (newestMs: Int64, total: Int)?
     private var continuation: AsyncThrowingStream<Event, Error>.Continuation?
     private var cursor: Int64 = 0
     private var resetRequested: Bool = false
@@ -78,6 +85,8 @@ final class BLEClient: NSObject {
             self.peripheral = nil
             self.requestChar = nil
             self.streamChar = nil
+            self.ackChar = nil
+            self.pendingAcknowledgement = nil
             continuation.onTermination = { @Sendable [weak self] _ in
                 Task { @MainActor in self?.tearDown() }
             }
@@ -100,17 +109,41 @@ final class BLEClient: NSObject {
         }
     }
 
+    /// Called only after all preceding batches have been durably saved to HealthKit.
+    func acknowledgeHealthKitCommit(newestMs: Int64, total: Int) {
+        guard pendingAcknowledgement?.newestMs == newestMs,
+              let peripheral, let ackChar else {
+            continuation?.yield(.error(.characteristicMissing))
+            continuation?.finish()
+            return
+        }
+        log.info("BLE: acknowledging HealthKit commit through \(newestMs)")
+        peripheral.writeValue(Self.le64(newestMs), for: ackChar, type: .withResponse)
+    }
+
     private func tearDown() {
         if let p = peripheral { manager.cancelPeripheralConnection(p) }
         peripheral = nil
         requestChar = nil
         streamChar = nil
+        ackChar = nil
+        pendingAcknowledgement = nil
         if manager.isScanning { manager.stopScan() }
         continuation = nil
     }
 }
 
 extension BLEClient: CBCentralManagerDelegate {
+    nonisolated func centralManager(_ central: CBCentralManager,
+                                    willRestoreState dict: [String : Any]) {
+        Task { @MainActor in
+            guard let restored = (dict[CBCentralManagerRestoredStatePeripheralsKey] as? [CBPeripheral])?.first else { return }
+            self.peripheral = restored
+            restored.delegate = self
+            self.log.info("BLE: restored peripheral \(restored.identifier.uuidString)")
+        }
+    }
+
     nonisolated func centralManagerDidUpdateState(_ central: CBCentralManager) {
         Task { @MainActor in
             switch central.state {
@@ -168,7 +201,7 @@ extension BLEClient: CBPeripheralDelegate {
             guard let svc = peripheral.services?.first(where: { $0.uuid == Self.serviceUUID }) else {
                 continuation?.yield(.error(.characteristicMissing)); continuation?.finish(); return
             }
-            peripheral.discoverCharacteristics([Self.requestUUID, Self.streamUUID, Self.statusUUID], for: svc)
+            peripheral.discoverCharacteristics([Self.requestUUID, Self.streamUUID, Self.statusUUID, Self.ackUUID], for: svc)
         }
     }
 
@@ -179,8 +212,9 @@ extension BLEClient: CBPeripheralDelegate {
             for ch in service.characteristics ?? [] {
                 if ch.uuid == Self.requestUUID { requestChar = ch }
                 if ch.uuid == Self.streamUUID  { streamChar  = ch }
+                if ch.uuid == Self.ackUUID     { ackChar = ch }
             }
-            guard let stream = streamChar, requestChar != nil else {
+            guard let stream = streamChar, requestChar != nil, ackChar != nil else {
                 log.error("BLE: missing characteristics req=\(self.requestChar == nil) stream=\(self.streamChar == nil)")
                 continuation?.yield(.error(.characteristicMissing)); continuation?.finish(); return
             }
@@ -226,8 +260,14 @@ extension BLEClient: CBPeripheralDelegate {
                 log.error("BLE: write error on \(characteristic.uuid): \(error.localizedDescription)")
                 continuation?.yield(.error(.decoding(error.localizedDescription)))
                 continuation?.finish()
+            } else if characteristic.uuid == Self.ackUUID,
+                      let pending = pendingAcknowledgement {
+                log.info("BLE: watch accepted HealthKit ACK through \(pending.newestMs)")
+                pendingAcknowledgement = nil
+                continuation?.yield(.done(newestMs: pending.newestMs, total: pending.total))
+                continuation?.finish()
             } else {
-                log.info("BLE: cursor write acknowledged")
+                log.info("BLE: request write acknowledged")
             }
         }
     }
@@ -249,8 +289,10 @@ extension BLEClient: CBPeripheralDelegate {
             case "data":
                 if let items = frame.items { continuation?.yield(.batch(items)) }
             case "done":
-                continuation?.yield(.done(newestMs: frame.newestMs ?? cursor, total: frame.total ?? 0))
-                continuation?.finish()
+                let newest = frame.newestMs ?? cursor
+                let total = frame.total ?? 0
+                pendingAcknowledgement = (newest, total)
+                continuation?.yield(.readyToAcknowledge(newestMs: newest, total: total))
             default:
                 continuation?.yield(.error(.decoding("unknown frame kind \(frame.kind)")))
                 continuation?.finish()
