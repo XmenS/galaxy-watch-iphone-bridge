@@ -71,6 +71,10 @@ data class Sample(
     val u: String? = null,           // unit
     @SerialName("s") val startMs: Long,
     @SerialName("e") val endMs: Long,
+    @SerialName("wt") val workoutType: String? = null,
+    @SerialName("wd") val workoutDistanceM: Double? = null,
+    @SerialName("wc") val workoutCaloriesKcal: Double? = null,
+    @SerialName("wh") val workoutAverageHr: Double? = null,
 )
 
 /** Decoded form of a write to the REQUEST characteristic. Extracted from

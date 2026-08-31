@@ -76,7 +76,11 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            MainScreen(onStart = ::ensurePermissionsThenStart, onStop = ::stopSync)
+            MainScreen(
+                onStart = ::ensurePermissionsThenStart,
+                onStop = ::stopSync,
+                onWorkoutToggle = ::toggleWorkout,
+            )
         }
         Handler(Looper.getMainLooper()).postDelayed({ ensurePermissionsThenStart() }, 300)
     }
@@ -107,14 +111,25 @@ class MainActivity : ComponentActivity() {
                 .setAction(com.wearos.ancsbridge.ancs.AncsService.ACTION_STOP),
         )
     }
+
+    private fun toggleWorkout() {
+        val action = if (BleState.workoutActive.value) {
+            SyncService.ACTION_WORKOUT_STOP
+        } else {
+            SyncService.ACTION_WORKOUT_START
+        }
+        ContextCompat.startForegroundService(this, Intent(this, SyncService::class.java).setAction(action))
+    }
 }
 
 @Composable
-private fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
+private fun MainScreen(onStart: () -> Unit, onStop: () -> Unit, onWorkoutToggle: () -> Unit) {
     val status by BleState.status.collectAsState()
     val steps by BleState.stepsThisSession.collectAsState()
     val hr by BleState.lastHrBpm.collectAsState()
     val warning by BleState.sensorWarning.collectAsState()
+    val workoutActive by BleState.workoutActive.collectAsState()
+    val workoutSeconds by BleState.workoutElapsedSeconds.collectAsState()
     val running = status != "Idle" && !status.startsWith("ERR")
 
     MaterialTheme {
@@ -191,18 +206,38 @@ private fun MainScreen(onStart: () -> Unit, onStop: () -> Unit) {
 
                     Spacer(Modifier.height(12.dp))
 
-                    Button(
-                        onClick = { if (running) onStop() else onStart() },
-                        colors = ButtonDefaults.primaryButtonColors(
-                            backgroundColor = if (running) Color(0xFF4A2A3A) else Color(0xFF6E3CFF),
-                        ),
-                        modifier = Modifier.size(48.dp),
-                    ) {
-                        Icon(
-                            imageVector = if (running) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                            contentDescription = if (running) "Stop" else "Start",
-                            tint = Color.White,
-                        )
+                    Row {
+                        Button(
+                            onClick = { if (running) onStop() else onStart() },
+                            colors = ButtonDefaults.primaryButtonColors(
+                                backgroundColor = if (running) Color(0xFF4A2A3A) else Color(0xFF6E3CFF),
+                            ),
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (running) Icons.Filled.Stop else Icons.Filled.PlayArrow,
+                                contentDescription = if (running) "Stop bridge" else "Start bridge",
+                                tint = Color.White,
+                            )
+                        }
+                        Spacer(Modifier.width(8.dp))
+                        Button(
+                            onClick = onWorkoutToggle,
+                            enabled = running,
+                            colors = ButtonDefaults.primaryButtonColors(
+                                backgroundColor = if (workoutActive) Color(0xFFC43D58) else Color(0xFF166B4A),
+                            ),
+                            modifier = Modifier.size(44.dp),
+                        ) {
+                            Icon(
+                                imageVector = if (workoutActive) Icons.Filled.Stop else Icons.Filled.DirectionsRun,
+                                contentDescription = if (workoutActive) "Stop walk" else "Start walk",
+                                tint = Color.White,
+                            )
+                        }
+                    }
+                    if (workoutActive) {
+                        Text("Walk ${workoutSeconds / 60}:${(workoutSeconds % 60).toString().padStart(2, '0')}", color = Color(0xFF7CFFB2), fontSize = 9.sp)
                     }
                 }
             }

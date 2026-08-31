@@ -14,6 +14,7 @@ import dev.galaxyhealthbridge.wearos.R
 import dev.galaxyhealthbridge.wearos.ble.GattServer
 import dev.galaxyhealthbridge.wearos.data.SampleStore
 import dev.galaxyhealthbridge.wearos.health.HealthReader
+import dev.galaxyhealthbridge.wearos.health.WorkoutTracker
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 
@@ -26,6 +27,7 @@ class SyncService : LifecycleService() {
     private lateinit var store: SampleStore
     private lateinit var reader: HealthReader
     private lateinit var gatt: GattServer
+    private lateinit var workout: WorkoutTracker
     private var wakeLock: PowerManager.WakeLock? = null
 
     override fun onCreate() {
@@ -33,12 +35,15 @@ class SyncService : LifecycleService() {
         store = SampleStore(applicationContext)
         reader = HealthReader(applicationContext, store, lifecycleScope)
         gatt = GattServer(applicationContext, store, lifecycleScope)
+        workout = WorkoutTracker(applicationContext, store)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
         when (intent?.action) {
             ACTION_STOP -> { stopWork(); stopSelf(); return START_NOT_STICKY }
+            ACTION_WORKOUT_START -> lifecycleScope.launch { runCatching { workout.startWalking() } }
+            ACTION_WORKOUT_STOP -> lifecycleScope.launch { runCatching { workout.stop() } }
             else -> startWork()
         }
         return START_STICKY
@@ -113,6 +118,8 @@ class SyncService : LifecycleService() {
     companion object {
         const val ACTION_START = "dev.galaxyhealthbridge.wearos.action.START"
         const val ACTION_STOP = "dev.galaxyhealthbridge.wearos.action.STOP"
+        const val ACTION_WORKOUT_START = "dev.galaxyhealthbridge.wearos.action.WORKOUT_START"
+        const val ACTION_WORKOUT_STOP = "dev.galaxyhealthbridge.wearos.action.WORKOUT_STOP"
         private const val NOTIF_ID = 1
     }
 }

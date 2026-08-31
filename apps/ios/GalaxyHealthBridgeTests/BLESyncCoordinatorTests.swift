@@ -75,6 +75,19 @@ final class BLESyncCoordinatorTests: XCTestCase {
         XCTAssertEqual(canonical.value, 6)
     }
 
+    func testWorkoutMapsWithMetrics() throws {
+        let wire = WireSample(
+            uid: "walk-1", t: "workout", v: nil, u: nil,
+            s: 1_700_000_000_000, e: 1_700_000_600_000,
+            wt: "walking", wd: 850, wc: 62, wh: 113
+        )
+        let canonical = try XCTUnwrap(BLESyncCoordinator.toCanonical(wire))
+        XCTAssertEqual(canonical.type, .workout)
+        XCTAssertEqual(canonical.metadata["distance_m"]?.doubleValue, 850)
+        let workout = try XCTUnwrap(canonical.toHKSample() as? HKWorkout)
+        XCTAssertEqual(workout.workoutActivityType, .walking)
+    }
+
     func testDistanceWireSampleMaps() throws {
         let now = Date()
         let nowMs = Int64(now.timeIntervalSince1970 * 1000)

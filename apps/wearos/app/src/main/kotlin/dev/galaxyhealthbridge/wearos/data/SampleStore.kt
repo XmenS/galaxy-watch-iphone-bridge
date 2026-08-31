@@ -84,8 +84,29 @@ class SampleStore(private val ctx: Context) {
     suspend fun upsert(uid: String, type: String, value: Double?, unit: String?, startMs: Long, endMs: Long) =
         withContext(Dispatchers.IO) { dao.upsert(uid, type, value, unit, startMs, endMs) }
 
+    suspend fun addWorkout(
+        uid: String, startMs: Long, endMs: Long, workoutType: String,
+        distanceM: Double?, caloriesKcal: Double?, averageHr: Double?,
+    ) = add(
+        uid, "workout", caloriesKcal,
+        listOf(workoutType, distanceM?.toString().orEmpty(), averageHr?.toString().orEmpty()).joinToString("|"),
+        startMs, endMs,
+    )
+
     suspend fun page(sinceMs: Long, limit: Int): List<Sample> =
-        withContext(Dispatchers.IO) { dao.fetchSince(sinceMs, limit).map { it.toSample() } }
+        withContext(Dispatchers.IO) {
+            dao.fetchSince(sinceMs, limit).map { row ->
+                if (row.type != "workout") return@map row.toSample()
+                val parts = row.unit.orEmpty().split('|')
+                Sample(
+                    uid = row.uid, t = "workout", startMs = row.startMs, endMs = row.endMs,
+                    workoutType = parts.getOrNull(0),
+                    workoutDistanceM = parts.getOrNull(1)?.toDoubleOrNull(),
+                    workoutCaloriesKcal = row.value,
+                    workoutAverageHr = parts.getOrNull(2)?.toDoubleOrNull(),
+                )
+            }
+        }
 
     suspend fun pending(sinceMs: Long): Int = withContext(Dispatchers.IO) { dao.countSince(sinceMs) }
     suspend fun newest(): Long = withContext(Dispatchers.IO) { dao.newest() ?: 0L }

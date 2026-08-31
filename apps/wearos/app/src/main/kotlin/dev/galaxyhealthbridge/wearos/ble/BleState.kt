@@ -33,4 +33,6 @@ object BleState {
 
     /** Last time we successfully streamed samples to the phone, epoch ms. */
     val lastSyncAtMs = MutableStateFlow<Long?>(null)
+    val workoutActive = MutableStateFlow(false)
+    val workoutElapsedSeconds = MutableStateFlow(0L)
 }

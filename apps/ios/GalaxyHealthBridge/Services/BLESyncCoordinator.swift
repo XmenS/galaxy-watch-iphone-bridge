@@ -105,6 +105,7 @@ final class BLESyncCoordinator: ObservableObject {
         case "cal":    type = .activeEnergy
         case "dist":   type = .distance
         case "floors": type = .flightsClimbed
+        case "workout": type = .workout
         case "sleep_in_bed": type = .sleepInBed
         case "sleep_awake":  type = .sleepAwake
         case "sleep_light":  type = .sleepLight
@@ -115,6 +116,13 @@ final class BLESyncCoordinator: ObservableObject {
         guard let t = type else { return nil }
 
         let (startedAt, endedAt) = rebaseTimestamps(startMs: w.s, endMs: w.e, now: now)
+        var metadata: [String: AnyCodable] = [:]
+        if t == .workout {
+            if let value = w.wt { metadata["workout_type"] = AnyCodable(value) }
+            if let value = w.wd { metadata["distance_m"] = AnyCodable(value) }
+            if let value = w.wc { metadata["calories_kcal"] = AnyCodable(value) }
+            if let value = w.wh { metadata["average_hr"] = AnyCodable(value) }
+        }
         return CanonicalSample(
             clientUid: w.uid,
             source: "GalaxyWatch",
@@ -123,7 +131,7 @@ final class BLESyncCoordinator: ObservableObject {
             value: w.v,
             startedAt: startedAt,
             endedAt: endedAt,
-            metadata: [:],
+            metadata: metadata,
             nonceB64: nil,
             ciphertextB64: nil,
         )

@@ -323,6 +323,16 @@ struct WireSample: Decodable {
     let u: String?
     let s: Int64                   // start millis
     let e: Int64                   // end millis
+    let wt: String?
+    let wd: Double?
+    let wc: Double?
+    let wh: Double?
+
+    init(uid: String, t: String, v: Double?, u: String?, s: Int64, e: Int64,
+         wt: String? = nil, wd: Double? = nil, wc: Double? = nil, wh: Double? = nil) {
+        self.uid = uid; self.t = t; self.v = v; self.u = u; self.s = s; self.e = e
+        self.wt = wt; self.wd = wd; self.wc = wc; self.wh = wh
+    }
 }
 
 private struct WireFrame: Decodable {

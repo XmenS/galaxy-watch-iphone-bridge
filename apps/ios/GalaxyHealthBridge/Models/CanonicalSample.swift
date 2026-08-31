@@ -33,6 +33,7 @@ enum CanonicalSampleType: String, CaseIterable, Codable {
     case stressScore            = "stress_score"
 
     var healthKitWriteType: HKSampleType? {
+        if self == .workout { return HKObjectType.workoutType() }
         if let q = healthKitQuantityType { return q }
         if let c = healthKitCategoryType { return c }
         return nil
@@ -165,6 +166,33 @@ struct CanonicalSample: Codable, Identifiable {
     }
 
     func toHKSample() -> HKSample? {
+        if type == .workout {
+            let workoutType: HKWorkoutActivityType
+            switch metadata["workout_type"]?.stringValue {
+            case "running": workoutType = .running
+            case "cycling": workoutType = .cycling
+            default: workoutType = .walking
+            }
+            let energy = metadata["calories_kcal"]?.doubleValue.map {
+                HKQuantity(unit: .kilocalorie(), doubleValue: $0)
+            }
+            let distance = metadata["distance_m"]?.doubleValue.map {
+                HKQuantity(unit: .meter(), doubleValue: $0)
+            }
+            var workoutMetadata: [String: Any] = ["GHBSource": source, "GHBClientUid": clientUid]
+            if let averageHr = metadata["average_hr"]?.doubleValue {
+                workoutMetadata["GHBAverageHeartRateBPM"] = averageHr
+            }
+            return HKWorkout(
+                activityType: workoutType,
+                start: startedAt,
+                end: endedAt,
+                duration: max(0, endedAt.timeIntervalSince(startedAt)),
+                totalEnergyBurned: energy,
+                totalDistance: distance,
+                metadata: workoutMetadata
+            )
+        }
         if let q = type.healthKitQuantityType, let unit = type.healthKitUnit, let v = value {
             let quantity = HKQuantity(unit: unit, doubleValue: v)
             return HKQuantitySample(
@@ -213,5 +241,12 @@ struct AnyCodable: Codable, Equatable {
 
     static func == (lhs: AnyCodable, rhs: AnyCodable) -> Bool {
         String(describing: lhs.value) == String(describing: rhs.value)
+    }
+
+    var stringValue: String? { value as? String }
+    var doubleValue: Double? {
+        if let v = value as? Double { return v }
+        if let v = value as? Int { return Double(v) }
+        return nil
     }
 }
