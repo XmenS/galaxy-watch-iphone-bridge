@@ -39,7 +39,7 @@ final class CanonicalSampleMappingTests: XCTestCase {
         XCTAssertEqual(cat.value, HKCategoryValueSleepAnalysis.asleepDeep.rawValue)
     }
 
-    func testWorkoutTypeReturnsNilForNow() {
+    func testWorkoutMapsToHKWorkout() throws {
         let s = CanonicalSample(
             clientUid: "u",
             source: "x",
@@ -52,7 +52,8 @@ final class CanonicalSampleMappingTests: XCTestCase {
             nonceB64: nil,
             ciphertextB64: nil
         )
-        // Workouts use HKWorkoutBuilder; mapper intentionally returns nil until implemented.
-        XCTAssertNil(s.toHKSample())
+        let workout = try XCTUnwrap(s.toHKSample() as? HKWorkout)
+        XCTAssertEqual(workout.workoutActivityType, .walking)
+        XCTAssertEqual(workout.metadata?["GHBClientUid"] as? String, "u")
     }
 }
