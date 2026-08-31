@@ -51,3 +51,22 @@ jobs:
             -configuration Debug \
             CODE_SIGNING_ALLOWED=NO \
             build test
+      - name: Build unsigned device app
+        run: |
+          xcodebuild \
+            -project GalaxyHealthBridge.xcodeproj \
+            -scheme GalaxyHealthBridge \
+            -sdk iphoneos \
+            -configuration Debug \
+            -derivedDataPath build/device \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+          mkdir -p build/ipa/Payload
+          cp -R build/device/Build/Products/Debug-iphoneos/GalaxyHealthBridge.app build/ipa/Payload/
+          ditto -c -k --sequesterRsrc --keepParent build/ipa/Payload build/GalaxyHealthBridge-unsigned.ipa
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: GalaxyHealthBridge-unsigned-ipa
+          path: apps/ios/build/GalaxyHealthBridge-unsigned.ipa
+          if-no-files-found: error
