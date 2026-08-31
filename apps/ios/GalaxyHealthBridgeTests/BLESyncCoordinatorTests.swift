@@ -1,4 +1,5 @@
 import XCTest
+import HealthKit
 @testable import GalaxyHealthBridge
 
 final class BLESyncCoordinatorTests: XCTestCase {
