@@ -54,7 +54,7 @@ dependencies {
     implementation("androidx.wear.compose:compose-foundation:1.3.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-service:2.8.2")
-    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    implementation("com.google.android.gms:play-services-wearable:20.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     // Health Services on the Watch
