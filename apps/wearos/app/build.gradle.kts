@@ -7,12 +7,12 @@ plugins {
 
 android {
     namespace = "dev.galaxyhealthbridge.wearos"
-    compileSdk = 35
+    compileSdk = 34
 
     defaultConfig {
         applicationId = "dev.galaxyhealthbridge.wearos"
         minSdk = 30                        // Wear OS 3
-        targetSdk = 35
+        targetSdk = 34
         versionCode = 1
         versionName = "1.0.0"
     }
