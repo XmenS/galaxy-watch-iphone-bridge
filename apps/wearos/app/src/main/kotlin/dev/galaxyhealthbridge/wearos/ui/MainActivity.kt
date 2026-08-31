@@ -58,6 +58,7 @@ class MainActivity : ComponentActivity() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.S) {
             add(Manifest.permission.BLUETOOTH_ADVERTISE)
             add(Manifest.permission.BLUETOOTH_CONNECT)
+            add(Manifest.permission.BLUETOOTH_SCAN)
         }
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
             add(Manifest.permission.POST_NOTIFICATIONS)
@@ -92,10 +93,19 @@ class MainActivity : ComponentActivity() {
             this,
             Intent(this, SyncService::class.java).setAction(SyncService.ACTION_START),
         )
+        ContextCompat.startForegroundService(
+            this,
+            Intent(this, com.wearos.ancsbridge.ancs.AncsService::class.java)
+                .setAction(com.wearos.ancsbridge.ancs.AncsService.ACTION_START),
+        )
     }
 
     private fun stopSync() {
         startService(Intent(this, SyncService::class.java).setAction(SyncService.ACTION_STOP))
+        startService(
+            Intent(this, com.wearos.ancsbridge.ancs.AncsService::class.java)
+                .setAction(com.wearos.ancsbridge.ancs.AncsService.ACTION_STOP),
+        )
     }
 }
 

@@ -207,7 +207,9 @@ class HealthReader(
         }
         dp.getData(DataType.CALORIES_DAILY).forEach { p: IntervalDataPoint<Double> ->
             BleState.activeKcal.value = p.value
-            upsertDailyTotal("cal", "kcal", p.value)
+            // Health Services defines CALORIES_DAILY as total energy (BMR + activity).
+            // Never label this as active energy; HealthKit has no combined daily-energy type.
+            upsertDailyTotal("cal_total", "kcal", p.value)
         }
         dp.getData(DataType.DISTANCE_DAILY).forEach { p: IntervalDataPoint<Double> ->
             BleState.distanceM.value = p.value

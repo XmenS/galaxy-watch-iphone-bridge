@@ -12,7 +12,7 @@ import android.os.Vibrator
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import com.wearos.ancsbridge.AncsApplication
-import com.wearos.ancsbridge.R
+import dev.galaxyhealthbridge.wearos.R
 import com.wearos.ancsbridge.ble.AncsConstants
 import com.wearos.ancsbridge.ble.BleConnectionManager
 import com.wearos.ancsbridge.ble.BleScanner
@@ -20,8 +20,7 @@ import com.wearos.ancsbridge.ble.BondStateReceiver
 import com.wearos.ancsbridge.model.AncsEvent
 import com.wearos.ancsbridge.model.AncsNotification
 import com.wearos.ancsbridge.model.ConnectionState
-import com.wearos.ancsbridge.ui.IncomingCallActivity
-import com.wearos.ancsbridge.ui.MainActivity
+import dev.galaxyhealthbridge.wearos.ui.MainActivity
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
@@ -45,7 +44,7 @@ class AncsService : Service() {
 
     companion object {
         private const val TAG = "AncsService"
-        private const val SERVICE_NOTIFICATION_ID = 1
+        private const val SERVICE_NOTIFICATION_ID = 2
         private const val NOTIFICATION_ID_BASE = 1000
 
         const val ACTION_START = "com.wearos.ancsbridge.START"
@@ -60,6 +59,12 @@ class AncsService : Service() {
         const val EXTRA_ACTION_ID = "action_id"
         const val EXTRA_QUICK_REPLY_TEXT = "quick_reply_text"
         const val NOTIFICATION_ID_CALL = 999
+        private const val ACTION_CALL_ANSWERED = "com.wearos.ancsbridge.CALL_ANSWERED"
+        private const val ACTION_CALL_ENDED = "com.wearos.ancsbridge.CALL_ENDED"
+        private const val ACTION_CALLER_NAME_UPDATED = "com.wearos.ancsbridge.CALLER_NAME_UPDATED"
+        private const val EXTRA_CALLER_NAME = "caller_name"
+        private const val EXTRA_NOTIFICATION_UID = "notification_uid"
+        private const val EXTRA_APP_NAME = "app_name"
         private const val MAX_ACTIVE_NOTIFICATIONS = 20 // Android limit is 25; keep headroom
 
         /** Shared connection state observable by the ViewModel */
@@ -266,7 +271,7 @@ class AncsService : Service() {
                     // Cancel the CallStyle notification — no longer ringing
                     notificationManager.cancel(NOTIFICATION_ID_CALL)
                     // Tell the activity to transition to "active call" UI
-                    sendBroadcast(Intent(IncomingCallActivity.ACTION_CALL_ANSWERED).apply {
+                    sendBroadcast(Intent(ACTION_CALL_ANSWERED).apply {
                         setPackage(packageName)
                     })
                     return
@@ -321,7 +326,7 @@ class AncsService : Service() {
                     vibrator.cancel()
                     notificationManager.cancel(NOTIFICATION_ID_CALL)
                     AncsConnectionService.endActiveCall()
-                    sendBroadcast(Intent(IncomingCallActivity.ACTION_CALL_ENDED).apply {
+                    sendBroadcast(Intent(ACTION_CALL_ENDED).apply {
                         setPackage(packageName)
                     })
                 }
@@ -351,7 +356,7 @@ class AncsService : Service() {
                     Log.i(TAG, "Companion: call answered on iPhone, transitioning overlay")
                     vibrator.cancel()
                     notificationManager.cancel(NOTIFICATION_ID_CALL)
-                    sendBroadcast(Intent(IncomingCallActivity.ACTION_CALL_ANSWERED).apply {
+                    sendBroadcast(Intent(ACTION_CALL_ANSWERED).apply {
                         setPackage(packageName)
                     })
                 }
@@ -364,7 +369,7 @@ class AncsService : Service() {
                     vibrator.cancel()
                     notificationManager.cancel(NOTIFICATION_ID_CALL)
                     AncsConnectionService.endActiveCall()
-                    sendBroadcast(Intent(IncomingCallActivity.ACTION_CALL_ENDED).apply {
+                    sendBroadcast(Intent(ACTION_CALL_ENDED).apply {
                         setPackage(packageName)
                     })
                 }
@@ -475,7 +480,7 @@ class AncsService : Service() {
             AncsApplication.channelForCategory(notification.categoryId)
         }
         val iconResId = AppIconMapper.getIconResId(notification.appIdentifier, notification.categoryId)
-        Log.d(TAG, "Icon mapping: app='${notification.appIdentifier}' cat=${notification.categoryId} -> resId=$iconResId (default=${R.drawable.ic_notification_default})")
+        Log.d(TAG, "Icon mapping: app='${notification.appIdentifier}' cat=${notification.categoryId} -> resId=$iconResId")
         val notifId = notificationIdForUid(notification.uid)
 
         val contentIntent = PendingIntent.getActivity(
@@ -538,7 +543,7 @@ class AncsService : Service() {
                 },
                 PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(R.drawable.ic_check, notification.positiveActionLabel, positiveIntent)
+            builder.addAction(android.R.drawable.checkbox_on_background, notification.positiveActionLabel, positiveIntent)
         }
 
         if (notification.negativeActionLabel != null) {
@@ -550,7 +555,7 @@ class AncsService : Service() {
                 },
                 PendingIntent.FLAG_IMMUTABLE
             )
-            builder.addAction(R.drawable.ic_close, notification.negativeActionLabel, negativeIntent)
+            builder.addAction(android.R.drawable.ic_menu_close_clear_cancel, notification.negativeActionLabel, negativeIntent)
         }
 
         // Never call setNotificationSilent() — it suppresses the heads-up overlay
@@ -587,9 +592,9 @@ class AncsService : Service() {
             if (callerName != "Incoming Call") {
                 AncsConnectionService.activeConnection?.updateCallerName(callerName)
                 // Also update the IncomingCallActivity via broadcast
-                sendBroadcast(Intent(IncomingCallActivity.ACTION_CALLER_NAME_UPDATED).apply {
+                sendBroadcast(Intent(ACTION_CALLER_NAME_UPDATED).apply {
                     setPackage(packageName)
-                    putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName)
+                    putExtra(EXTRA_CALLER_NAME, callerName)
                 })
                 Log.i(TAG, "Updated caller name to '$callerName' for uid=${notification.uid}")
             }
@@ -605,14 +610,14 @@ class AncsService : Service() {
 
         // 2. Directly launch call activity — the Telecom self-managed connection
         //    grants us the background activity start exception
-        val callIntent = Intent(this, IncomingCallActivity::class.java).apply {
+        val callIntent = Intent(this, MainActivity::class.java).apply {
             flags = Intent.FLAG_ACTIVITY_NEW_TASK or
                 Intent.FLAG_ACTIVITY_CLEAR_TOP or
                 Intent.FLAG_ACTIVITY_NO_USER_ACTION or
                 Intent.FLAG_ACTIVITY_REORDER_TO_FRONT
-            putExtra(IncomingCallActivity.EXTRA_CALLER_NAME, callerName)
-            putExtra(IncomingCallActivity.EXTRA_NOTIFICATION_UID, notification.uid)
-            putExtra(IncomingCallActivity.EXTRA_APP_NAME, appName)
+            putExtra(EXTRA_CALLER_NAME, callerName)
+            putExtra(EXTRA_NOTIFICATION_UID, notification.uid)
+            putExtra(EXTRA_APP_NAME, appName)
         }
         try {
             startActivity(callIntent)
@@ -643,7 +648,7 @@ class AncsService : Service() {
             .setImportant(true)
             .build()
         val callNotification = NotificationCompat.Builder(this, AncsApplication.CHANNEL_INCOMING_CALL)
-            .setSmallIcon(R.drawable.ic_phone)
+            .setSmallIcon(android.R.drawable.sym_action_call)
             .setPriority(NotificationCompat.PRIORITY_MAX)
             .setCategory(Notification.CATEGORY_CALL)
             .setFullScreenIntent(fullScreenPendingIntent, true)
@@ -716,7 +721,7 @@ class AncsService : Service() {
     private fun androidCategory(categoryId: Int): String = when (categoryId) {
         AncsConstants.CATEGORY_INCOMING_CALL -> Notification.CATEGORY_CALL
         AncsConstants.CATEGORY_MISSED_CALL -> Notification.CATEGORY_MISSED_CALL
-        AncsConstants.CATEGORY_VOICEMAIL -> Notification.CATEGORY_VOICEMAIL
+        3 -> Notification.CATEGORY_CALL
         AncsConstants.CATEGORY_SOCIAL -> Notification.CATEGORY_SOCIAL
         AncsConstants.CATEGORY_SCHEDULE -> Notification.CATEGORY_EVENT
         AncsConstants.CATEGORY_EMAIL -> Notification.CATEGORY_EMAIL
@@ -733,7 +738,7 @@ class AncsService : Service() {
             PendingIntent.FLAG_IMMUTABLE
         )
         return NotificationCompat.Builder(this, AncsApplication.CHANNEL_SERVICE)
-            .setSmallIcon(R.drawable.ic_notification_default)
+            .setSmallIcon(android.R.drawable.stat_sys_data_bluetooth)
             .setContentTitle("WearBridge")
             .setContentText(text)
             .setContentIntent(intent)

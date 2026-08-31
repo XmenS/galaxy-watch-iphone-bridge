@@ -32,6 +32,13 @@ android {
     kotlinOptions { jvmTarget = "17" }
     buildFeatures { compose = true }
     composeOptions { kotlinCompilerExtensionVersion = "1.5.14" }
+    testOptions { unitTests.isReturnDefaultValues = true }
+    sourceSets["main"].java.srcDirs(
+        "../../../third_party/WearBridge/wearos-app/app/src/main/java/com/wearos/ancsbridge/ancs",
+        "../../../third_party/WearBridge/wearos-app/app/src/main/java/com/wearos/ancsbridge/ble",
+        "../../../third_party/WearBridge/wearos-app/app/src/main/java/com/wearos/ancsbridge/model",
+    )
+    sourceSets["test"].java.srcDir("../../../third_party/WearBridge/wearos-app/app/src/test/java")
 }
 
 dependencies {
@@ -47,6 +54,8 @@ dependencies {
     implementation("androidx.wear.compose:compose-foundation:1.3.1")
     implementation("androidx.lifecycle:lifecycle-runtime-ktx:2.8.2")
     implementation("androidx.lifecycle:lifecycle-service:2.8.2")
+    implementation("com.google.android.gms:play-services-wearable:18.2.0")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.9.0")
 
     // Health Services on the Watch
     implementation("androidx.health:health-services-client:1.0.0-rc02")

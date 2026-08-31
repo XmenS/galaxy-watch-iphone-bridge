@@ -21,6 +21,10 @@ targets:
     platform: iOS
     sources:
       - path: GalaxyHealthBridge
+      - path: ../../third_party/WearBridge/ios-app/AncsBridge/BLE
+      - path: ../../third_party/WearBridge/ios-app/AncsBridge/Storage/SettingsStore.swift
+      - path: ../../third_party/WearBridge/ios-app/AncsBridge/Model/PairedDevice.swift
+      - path: ../../third_party/WearBridge/ios-app/AncsBridge/Model/ConnectionState.swift
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: dev.galaxyhealthbridge.app.piyush2026
@@ -33,11 +37,12 @@ targets:
     dependencies:
       - sdk: HealthKit.framework
       - sdk: CoreBluetooth.framework
+      - sdk: CallKit.framework
     capabilities:
       HealthKit:
         enabled: true
       BackgroundModes:
-        modes: [bluetooth-central]
+        modes: [bluetooth-central, bluetooth-peripheral]
 
   GalaxyHealthBridgeTests:
     type: bundle.unit-test

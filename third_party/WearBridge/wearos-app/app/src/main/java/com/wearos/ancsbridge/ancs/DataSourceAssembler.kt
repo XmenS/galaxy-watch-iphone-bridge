@@ -142,8 +142,11 @@ class DataSourceAssembler {
 
                 // Read 2-byte length
                 if (offset + 1 >= bytes.size) {
-                    // Need more data for length
-                    compactBuffer(bytes, offset)
+                    // Keep the attribute ID together with the partial length. Otherwise
+                    // the next fragment sees currentAttrId set but currentAttrLength=-1
+                    // and interprets the remaining byte as payload.
+                    currentAttrId = -1
+                    compactBuffer(bytes, offset - 1)
                     return null
                 }
 
